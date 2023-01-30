@@ -4,45 +4,34 @@ module RSpec
   module Parallel
     module GoGoGo
       module ProgressFramer
+        BAR_WIDTH = 5
+        BAR_CHAR = "oGo"
+        BAR_CHAR_LEN = BAR_CHAR.length
+
         module_function
-
-        def cal_width(counter)
-          @cal_width ||= begin
-            width = terminal_width # terminal width
-            width -= result(counter).length
-            width -= rate(counter).length
-            width -= 5 # blank * 3 and "|" * 2
-            width
-          end
-        end
-
-        def terminal_width
-          @terminal_width ||= `tput cols`.to_i
-        end
 
         def init_display(total_processes)
           "\n" * total_processes
         end
 
         def display(counter, move_number)
-          "\r\e[#{move_number}E" + "#{result(counter)} #{bar(counter)} #{rate(counter)}" + "\e[#{move_number}F"
+          "\r\e[#{move_number}E" + "#{rate(counter)} #{bar(counter)} #{result(counter)}" + "\e[#{move_number}F"
         end
 
         def bar(counter)
-          width = cal_width(counter)
           progress_bar = if counter.rate >= 1
-                           completed_progress_bar(width)
-                         elsif counter.rate <= 0
-                           no_progress_bar(width)
+                           completed_progress_bar
                          else
-                           in_progress_bar(counter, width)
+                           in_progress_bar(counter)
                          end
           RSpec::Core::Formatters::ConsoleCodes.wrap("|#{progress_bar}|", :magenta)
         end
 
         def result(counter)
-          max = counter.total.to_s.length
-          format("%#{max}s examples, %#{max}s failures", counter.checks, counter.failures)
+          checks = counter.checks
+          failures = counter.failures
+
+          format("%#{checks.to_s.length}s examples, %#{failures.to_s.length}s failures", checks, failures)
         end
 
         def rate(counter)
@@ -50,20 +39,26 @@ module RSpec
           "#{format("%3s", percent)}%"
         end
 
-        # bar: ----------
-        def no_progress_bar(width)
-          "-" * width
+        def in_progress_bar(counter)
+          width = BAR_WIDTH + BAR_CHAR_LEN + BAR_CHAR_LEN
+          blank_bar = (" " * blank_len(counter))
+          bar = "#{blank_bar}#{BAR_CHAR}".ljust(width, " ")
+          bar.slice(BAR_CHAR_LEN, BAR_WIDTH)
         end
 
-        # bar: GoGoGo-----
-        def in_progress_bar(counter, width)
-          bar_len = counter.rate * width.to_f / 2
-          ("Go" * bar_len).ljust(width, "-")
+        def blank_len(counter)
+          v_len = (BAR_WIDTH + BAR_CHAR_LEN) * 2
+          len = counter.checks % v_len
+          if len > BAR_WIDTH + BAR_CHAR_LEN
+            # reverse
+            v_len - len
+          else
+            len
+          end
         end
 
-        # bar: ==========
-        def completed_progress_bar(width)
-          "=" * width
+        def completed_progress_bar
+          "=" * BAR_WIDTH
         end
       end
     end
